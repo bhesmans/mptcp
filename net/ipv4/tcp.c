@@ -3003,6 +3003,61 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);
 
+static int mptcp_getsockopt_sub_ids(struct sock *sk, char __user *optval,
+				    int __user *optlen) {
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct sock *sk_loop;
+	struct mptcp_cb *mpcb = tp->mpcb;
+	struct mptcp_sub_ids *ids;
+	int len, needed_len;
+	int i;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+
+/* TODO check if we need any lock ?? */
+
+	needed_len = sizeof(struct mptcp_sub_ids) +
+		sizeof(struct mptcp_sub_status) * mpcb->cnt_subflows;
+	if (len < needed_len)
+		return -EINVAL;
+
+	len = needed_len;
+
+	ids = kmalloc(len, GFP_KERNEL);
+	if (unlikely(!ids))
+		return -ENOMEM;
+
+	ids->sub_count = mpcb->cnt_subflows;
+
+	i = 0;
+	mptcp_for_each_sk(mpcb, sk_loop) {
+		struct tcp_sock *tp_loop;
+		struct mptcp_tcp_sock *mp_tp;
+
+		if (i >= mpcb->cnt_subflows) {
+			/* TODO */
+			break;
+		}
+
+		tp_loop = tcp_sk(sk_loop);
+		mp_tp = tp_loop->mptcp;
+		ids->sub_status[i].id = mp_tp->path_index;
+		ids->sub_status[i].fully_established = mp_tp->fully_established;
+		ids->sub_status[i].attached = mp_tp->attached;
+		ids->sub_status[i].pre_established = mp_tp->pre_established;
+		i++;
+	}
+
+	if (put_user(len, optlen) || copy_to_user(optval, ids, len)) {
+		kfree(ids);
+		return -EFAULT;
+	}
+
+	kfree(ids);
+	return 0;
+}
+
 static int do_tcp_getsockopt(struct sock *sk, int level,
 		int optname, char __user *optval, int __user *optlen)
 {
@@ -3250,6 +3305,7 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		else
 			val = sock_flag(sk, SOCK_MPTCP) ? 1 : 0;
 		break;
+
 	case MPTCP_INFO:
 	{
 		int ret;
@@ -3273,6 +3329,11 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 			return -EFAULT;
 		return 0;
 	}
+
+	case MPTCP_GET_SUB_IDS:
+		if (!mptcp(tp))
+			return -EOPNOTSUPP;
+		return mptcp_getsockopt_sub_ids(sk, optval, optlen);
 #endif
 	default:
 		return -ENOPROTOOPT;
