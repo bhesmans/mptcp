@@ -133,6 +133,24 @@ enum {
 
 #define MPTCP_INFO_FLAG_SAVE_MASTER	0x01
 
+/* MPTCP API */
+
+#define MPTCP_GET_SUB_IDS	66	/* Get subflows ids */
+
+struct mptcp_sub_status {
+	__u8	id;
+	__u16	slave_sk:1,
+		fully_established:1,
+		attached:1,
+		low_prio:1,
+		pre_established:1;
+};
+
+struct mptcp_sub_ids {
+	__u8			sub_count;
+	struct mptcp_sub_status sub_status[];
+};
+
 struct tcp_repair_opt {
 	__u32	opt_code;
 	__u32	opt_val;
