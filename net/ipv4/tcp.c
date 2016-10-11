@@ -2500,6 +2500,36 @@ static int tcp_repair_options_est(struct tcp_sock *tp,
 	return 0;
 }
 
+static int mptcp_setsockopt_sub_setsockopt(struct sock *sk, char __user *optval,
+					   int __user optlen) {
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct mptcp_cb *mpcb = tp->mpcb;
+	struct sock *sub_sk;
+	struct mptcp_sub_setsockopt sub_setsockopt;
+
+	if (optlen != sizeof(struct mptcp_sub_setsockopt))
+		return -EINVAL;
+
+	if (copy_from_user(&sub_setsockopt, optval, optlen))
+		return -EFAULT;
+
+	mptcp_for_each_sk(mpcb, sub_sk) {
+		struct tcp_sock *sub_tp;
+		struct mptcp_tcp_sock *sub_mptp;
+
+		sub_tp = tcp_sk(sub_sk);
+		sub_mptp = sub_tp->mptcp;
+
+		if (sub_mptp->path_index == sub_setsockopt.id) {
+			return tcp_setsockopt(sub_sk, sub_setsockopt.level,
+				       sub_setsockopt.optname,
+				       sub_setsockopt.optval,
+				       sub_setsockopt.optlen);
+		}
+	}
+
+	return -EINVAL;
+}
 /*
  *	Socket option code for TCP.
  */
@@ -2859,6 +2889,7 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		else
 			mptcp_disable_sock(sk);
 		break;
+
 	case MPTCP_INFO:
 		if (mptcp_init_failed || !sysctl_mptcp_enabled) {
 			err = -EPERM;
@@ -2866,6 +2897,11 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		}
 
 		tp->record_master_info = !!(val & MPTCP_INFO_FLAG_SAVE_MASTER);
+
+	case MPTCP_SUB_SETSOCKOPT:
+		if (!mptcp(tp))
+			return -EOPNOTSUPP;
+		err = mptcp_setsockopt_sub_setsockopt(sk, optval, optlen);
 		break;
 #endif
 	default:
