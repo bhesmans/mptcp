@@ -141,6 +141,15 @@ enum {
 #define MPTCP_OPEN_SUB_TUPLE	69	/* Open sub tuple */
 
 #define MPTCP_SUB_GETSOCKOPT	71	/* Get sockopt for a specific sub */
+#define MPTCP_SUB_SETSOCKOPT	72	/* Set sockopt for a specific sub */
+
+struct mptcp_sub_setsockopt {
+	__u8		id;
+	int		level;
+	int		optname;
+	char __user	*optval;
+	unsigned int	optlen;
+};
 
 struct mptcp_sub_getsockopt {
 	__u8		id;
