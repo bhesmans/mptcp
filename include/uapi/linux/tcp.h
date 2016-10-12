@@ -134,6 +134,7 @@ enum {
 #define MPTCP_GET_SUB_IDS	66	/* Get subflows ids */
 #define MPTCP_CLOSE_SUB_ID	67	/* Close sub id */
 #define MPTCP_GET_SUB_TUPLE	68	/* Get sub tuple */
+#define MPTCP_OPEN_SUB_TUPLE	69	/* Open sub tuple */
 
 struct mptcp_sub_tuple {
 	__u8	id;

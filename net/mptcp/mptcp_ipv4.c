@@ -323,7 +323,7 @@ int mptcp_init4_subsockets(struct sock *meta_sk, const struct mptcp_loc4 *loc,
 	/** Then, connect the socket to the peer */
 	loc_in.sin_family = AF_INET;
 	rem_in.sin_family = AF_INET;
-	loc_in.sin_port = 0;
+	loc_in.sin_port = loc->port;
 	if (rem->port)
 		rem_in.sin_port = rem->port;
 	else

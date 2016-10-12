@@ -317,7 +317,7 @@ int mptcp_init6_subsockets(struct sock *meta_sk, const struct mptcp_loc6 *loc,
 	/** Then, connect the socket to the peer */
 	loc_in.sin6_family = AF_INET6;
 	rem_in.sin6_family = AF_INET6;
-	loc_in.sin6_port = 0;
+	loc_in.sin6_port = loc->port;
 	if (rem->port)
 		rem_in.sin6_port = rem->port;
 	else

@@ -56,6 +56,7 @@
 struct mptcp_loc4 {
 	u8		loc4_id;
 	u8		low_prio:1;
+	__be16		port;
 	int		if_idx;
 	struct in_addr	addr;
 };
@@ -69,6 +70,7 @@ struct mptcp_rem4 {
 struct mptcp_loc6 {
 	u8		loc6_id;
 	u8		low_prio:1;
+	__be16		port;
 	int		if_idx;
 	struct in6_addr	addr;
 };

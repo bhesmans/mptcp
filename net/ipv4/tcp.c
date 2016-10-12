@@ -283,6 +283,11 @@
 #include <asm/unaligned.h>
 #include <net/busy_poll.h>
 
+#include <net/mptcp_v4.h>
+#if IS_ENABLED(CONFIG_IPV6)
+#include <net/mptcp_v6.h>
+#endif
+
 int sysctl_tcp_min_tso_segs __read_mostly = 2;
 
 int sysctl_tcp_autocorking __read_mostly = 1;
@@ -3195,6 +3200,87 @@ static int mptcp_getsockopt_get_sub_tuple(struct sock *sk, char __user *optval,
 	return 0;
 }
 
+static int mptcp_getsockopt_open_sub_tuple(struct sock *sk, char __user *optval,
+					   int __user *optlen) {
+	struct tcp_sock *tp = tcp_sk(sk);
+	int len, addrlen, len4, len6, portlen;
+
+	portlen = sizeof(__be16);
+
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+
+	len4 = sizeof(struct mptcp_sub_tuple) + 2 * sizeof(struct sockaddr_in);
+	if (len == len4) {
+		struct sockaddr_in __user *sin;
+		struct mptcp_rem4 rem;
+		struct mptcp_loc4 loc;
+
+		addrlen = sizeof(struct in_addr);
+
+		sin = (struct sockaddr_in *)(optval +
+					     offsetof(struct mptcp_sub_tuple,
+						      addrs));
+
+		if (copy_from_user(&loc.addr.s_addr, &sin->sin_addr.s_addr,
+				   addrlen))
+			return -EFAULT;
+		if (copy_from_user(&loc.port, &sin->sin_port, portlen))
+			return -EFAULT;
+
+		sin++;
+
+		if (copy_from_user(&rem.addr.s_addr, &sin->sin_addr.s_addr,
+				   addrlen))
+			return -EFAULT;
+		if (copy_from_user(&rem.port, &sin->sin_port, portlen))
+			return -EFAULT;
+
+		loc.low_prio = 0;
+		loc.if_idx = 0;
+
+		return mptcp_init4_subsockets(tp->meta_sk, &loc, &rem);
+	}
+
+#if IS_ENABLED(CONFIG_IPV6)
+	len6 = sizeof(struct mptcp_sub_tuple) + 2 * sizeof(struct sockaddr_in6);
+	if (len == len6) {
+		struct sockaddr_in6 __user *sin;
+		struct mptcp_rem6 rem;
+		struct mptcp_loc6 loc;
+
+		addrlen = sizeof(struct in6_addr);
+
+		sin = (struct sockaddr_in6 *)(optval +
+					      offsetof(struct mptcp_sub_tuple,
+						       addrs));
+
+		if (copy_from_user(&loc.addr.s6_addr, &sin->sin6_addr.s6_addr,
+				   addrlen))
+			return -EFAULT;
+		if (copy_from_user(&loc.port, &sin->sin6_port, portlen))
+			return -EFAULT;
+
+		sin++;
+
+		if (copy_from_user(&rem.addr.s6_addr, &sin->sin6_addr.s6_addr,
+				   addrlen))
+			return -EFAULT;
+
+		if (copy_from_user(&rem.port, &sin->sin6_port, portlen))
+			return -EFAULT;
+
+		loc.low_prio = 0;
+		loc.if_idx = 0;
+
+		return mptcp_init6_subsockets(tp->meta_sk, &loc, &rem);
+	}
+#endif
+
+	return -EINVAL;
+}
+
 static int do_tcp_getsockopt(struct sock *sk, int level,
 		int optname, char __user *optval, int __user *optlen)
 {
@@ -3479,6 +3565,10 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		if (!mptcp(tp))
 			return -EOPNOTSUPP;
 		return mptcp_getsockopt_get_sub_tuple(sk, optval, optlen);
+	case MPTCP_OPEN_SUB_TUPLE:
+		if (!mptcp(tp))
+			return -EOPNOTSUPP;
+		return mptcp_getsockopt_open_sub_tuple(sk, optval, optlen);
 #endif
 	default:
 		return -ENOPROTOOPT;
