@@ -3221,6 +3221,43 @@ static int mptcp_getsockopt_sub_ids(struct sock *sk, char __user *optval,
 	return 0;
 }
 
+static int mptcp_getsockopt_close_sub_id(struct sock *sk, char __user *optval,
+					 int __user *optlen) {
+	struct tcp_sock *tp = tcp_sk(sk);
+	int len;
+	struct mptcp_cb *mpcb = tp->mpcb;
+	struct sock *sub_sk, *tmp;
+	struct mptcp_close_sub_id close_sub;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+
+	if (len < sizeof(struct mptcp_close_sub_id))
+		return -EINVAL;
+
+	if (copy_from_user(&close_sub, optval, len))
+		return -EFAULT;
+
+	mptcp_for_each_sk_safe(mpcb, sub_sk, tmp) {
+		struct tcp_sock *sub_tp;
+		struct mptcp_tcp_sock *sub_mptp;
+
+		sub_tp = tcp_sk(sub_sk);
+		sub_mptp = sub_tp->mptcp;
+
+		if (sub_mptp->path_index == close_sub.id) {
+			/* TODO check if it's a safe way to do it */
+			local_bh_disable();
+			mptcp_reinject_data(sub_sk, 0);
+			mptcp_sub_force_close(sub_sk);
+			local_bh_enable();
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
 static int do_tcp_getsockopt(struct sock *sk, int level,
 		int optname, char __user *optval, int __user *optlen)
 {
@@ -3517,6 +3554,10 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		if (!mptcp(tp))
 			return -EOPNOTSUPP;
 		return mptcp_getsockopt_sub_ids(sk, optval, optlen);
+	case MPTCP_CLOSE_SUB_ID:
+		if (!mptcp(tp))
+			return -EOPNOTSUPP;
+		return mptcp_getsockopt_close_sub_id(sk, optval, optlen);
 #endif
 	default:
 		return -ENOPROTOOPT;
