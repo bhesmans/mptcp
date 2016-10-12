@@ -3281,6 +3281,41 @@ static int mptcp_getsockopt_open_sub_tuple(struct sock *sk, char __user *optval,
 	return -EINVAL;
 }
 
+static int mptcp_getsockopt_sub_getsockopt(struct sock *sk, char __user *optval,
+					   int __user *optlen) {
+	struct tcp_sock *tp = tcp_sk(sk);
+	int len;
+	struct mptcp_cb *mpcb = tp->mpcb;
+	struct sock *sub_sk;
+	struct mptcp_sub_getsockopt sub_getsockopt;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+
+	if (len != sizeof(struct mptcp_sub_getsockopt))
+		return -EINVAL;
+
+	if (copy_from_user(&sub_getsockopt, optval, len))
+		return -EFAULT;
+
+	mptcp_for_each_sk(mpcb, sub_sk) {
+		struct tcp_sock *sub_tp;
+		struct mptcp_tcp_sock *sub_mptp;
+
+		sub_tp = tcp_sk(sub_sk);
+		sub_mptp = sub_tp->mptcp;
+
+		if (sub_mptp->path_index == sub_getsockopt.id) {
+			return tcp_getsockopt(sub_sk, sub_getsockopt.level,
+				       sub_getsockopt.optname,
+				       sub_getsockopt.optval,
+				       sub_getsockopt.optlen);
+		}
+	}
+
+	return -EINVAL;
+}
+
 static int do_tcp_getsockopt(struct sock *sk, int level,
 		int optname, char __user *optval, int __user *optlen)
 {
@@ -3569,6 +3604,10 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		if (!mptcp(tp))
 			return -EOPNOTSUPP;
 		return mptcp_getsockopt_open_sub_tuple(sk, optval, optlen);
+	case MPTCP_SUB_GETSOCKOPT:
+		if (!mptcp(tp))
+			return -EOPNOTSUPP;
+		return mptcp_getsockopt_sub_getsockopt(sk, optval, optlen);
 #endif
 	default:
 		return -ENOPROTOOPT;
