@@ -132,6 +132,7 @@ enum {
 /* MPTCP API */
 
 #define MPTCP_GET_SUB_IDS	66	/* Get subflows ids */
+#define MPTCP_CLOSE_SUB_ID	67	/* Close sub id */
 
 struct mptcp_sub_status {
 	__u8	id;
@@ -145,6 +146,10 @@ struct mptcp_sub_status {
 struct mptcp_sub_ids {
 	__u8			sub_count;
 	struct mptcp_sub_status sub_status[];
+};
+
+struct mptcp_close_sub_id {
+	__u8	id;
 };
 
 struct tcp_repair_opt {
