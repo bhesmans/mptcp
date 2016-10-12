@@ -3095,6 +3095,106 @@ static int mptcp_getsockopt_close_sub_id(struct sock *sk, char __user *optval,
 	return -EINVAL;
 }
 
+static int mptcp_getsockopt_get_sub_tuple(struct sock *sk, char __user *optval,
+					  int __user *optlen) {
+	struct tcp_sock *tp = tcp_sk(sk);
+	int len, addrlen;
+	struct mptcp_cb *mpcb = tp->mpcb;
+	struct sock *sub_sk;
+	struct mptcp_sub_tuple sub_tuple;
+	size_t space_left, needed_len;
+	void __user *to;
+	bool found = false;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+
+	if (len < sizeof(struct mptcp_sub_tuple))
+		return -EINVAL;
+
+	if (copy_from_user(&sub_tuple, optval, sizeof(struct mptcp_sub_tuple)))
+		return -EFAULT;
+
+	space_left = len - offsetof(struct mptcp_sub_tuple, addrs);
+
+	mptcp_for_each_sk(mpcb, sub_sk) {
+		struct tcp_sock *sub_tp;
+		struct mptcp_tcp_sock *sub_mptp;
+		struct inet_sock *sub_inet = inet_sk(sub_sk);
+
+		sub_tp = tcp_sk(sub_sk);
+		sub_mptp = sub_tp->mptcp;
+		if (sub_mptp->path_index == sub_tuple.id) {
+			found = true;
+			if (sub_sk->sk_family == AF_INET) {
+				struct sockaddr_in sin;
+
+				addrlen = sizeof(struct sockaddr_in);
+				to = optval +
+				     offsetof(struct mptcp_sub_tuple, addrs);
+
+				needed_len = 2 * sizeof(struct sockaddr_in);
+				if (space_left < needed_len)
+					return -EINVAL;
+
+				len = needed_len +
+				      sizeof(struct mptcp_sub_tuple);
+				/* TODO check inet_rcv_saddr ? */
+				sin.sin_port = sub_inet->inet_sport;
+				sin.sin_addr.s_addr = sub_inet->inet_saddr;
+				sin.sin_family = AF_INET;
+				if (copy_to_user(to, &sin, addrlen))
+					return -EFAULT;
+				to += addrlen;
+
+				sin.sin_port = sub_inet->inet_dport;
+				sin.sin_addr.s_addr = sub_inet->inet_daddr;
+				sin.sin_family = AF_INET;
+				if (copy_to_user(to, &sin, addrlen))
+					return -EFAULT;
+			}
+#if IS_ENABLED(CONFIG_IPV6)
+			if (sub_sk->sk_family == AF_INET6) {
+				struct sockaddr_in6 sin;
+				struct ipv6_pinfo *np = inet6_sk(sub_sk);
+
+				addrlen = sizeof(struct sockaddr_in6);
+				to = optval +
+				     offsetof(struct mptcp_sub_tuple, addrs);
+
+				needed_len = 2 * sizeof(struct sockaddr_in6);
+				if (space_left < needed_len)
+					return -EINVAL;
+
+				len = needed_len +
+				      sizeof(struct mptcp_sub_tuple);
+
+				sin.sin6_port = sub_inet->inet_sport;
+				sin.sin6_addr = np->saddr;
+				sin.sin6_family = AF_INET6;
+				if (copy_to_user(to, &sin, addrlen))
+					return -EFAULT;
+				to += addrlen;
+
+				sin.sin6_port = sub_inet->inet_dport;
+				sin.sin6_addr = sub_sk->sk_v6_daddr;
+				sin.sin6_family = AF_INET6;
+				if (copy_to_user(to, &sin, addrlen))
+					return -EFAULT;
+			}
+#endif
+		}
+	}
+
+	if (!found)
+		return -EINVAL;
+
+	if (put_user(len, optlen))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int do_tcp_getsockopt(struct sock *sk, int level,
 		int optname, char __user *optval, int __user *optlen)
 {
@@ -3375,6 +3475,10 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		if (!mptcp(tp))
 			return -EOPNOTSUPP;
 		return mptcp_getsockopt_close_sub_id(sk, optval, optlen);
+	case MPTCP_GET_SUB_TUPLE:
+		if (!mptcp(tp))
+			return -EOPNOTSUPP;
+		return mptcp_getsockopt_get_sub_tuple(sk, optval, optlen);
 #endif
 	default:
 		return -ENOPROTOOPT;
