@@ -170,6 +170,7 @@ struct mptcp_sub_status {
 		fully_established:1,
 		attached:1,
 		low_prio:1,
+		rcv_low_prio:1,
 		pre_established:1;
 };
 
