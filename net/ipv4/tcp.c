@@ -3087,6 +3087,8 @@ static int mptcp_getsockopt_sub_ids(struct sock *sk, char __user *optval,
 		ids->sub_status[i].fully_established = mp_tp->fully_established;
 		ids->sub_status[i].attached = mp_tp->attached;
 		ids->sub_status[i].pre_established = mp_tp->pre_established;
+		ids->sub_status[i].low_prio = mp_tp->low_prio;
+		ids->sub_status[i].rcv_low_prio = mp_tp->rcv_low_prio;
 		i++;
 	}
 
