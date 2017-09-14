@@ -3016,6 +3016,14 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char __user *optval,
 {
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 
+	/* This is kind of a trick for MPTCP, not clean though :/ sorry :/ */
+	if (level == SOL_SOCKET) {
+		struct socket_alloc sock_full;
+		struct socket *sock = (struct socket *)&sock_full;
+		sock->sk = sk;
+		return sock_setsockopt(sock, level, optname, optval, optlen);
+	}
+
 	if (level != SOL_TCP)
 		return icsk->icsk_af_ops->setsockopt(sk, level, optname,
 						     optval, optlen);
