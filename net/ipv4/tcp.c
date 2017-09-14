@@ -2900,7 +2900,7 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 
 	case MPTCP_SUB_SETSOCKOPT:
 		if (!mptcp(tp))
-			return -EOPNOTSUPP;
+			break;
 		err = mptcp_setsockopt_sub_setsockopt(sk, optval, optlen);
 		break;
 #endif
